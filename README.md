@@ -3,6 +3,7 @@
 Running the tool:
 
 import lightingTool
+
 lightingTool.main()
 
 -- Setting the HDR Folder Path:
