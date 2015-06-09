@@ -118,7 +118,9 @@ class TabContent():
     #### RENDER LAYERS COMBO
 
     def _getRenderLayers(self):
-        rLayers = [x for x in cmds.ls(type='renderLayer')]
+        # TODO: review avoiding more than one defaultRenderLayer
+        rLayers = [x for x in cmds.ls(type='renderLayer') \
+                    if not x.endswith(":defaultRenderLayer")]
 
         ## Hack to have default layer at bottom
         if "defaultRenderLayer" in rLayers:
