@@ -1,12 +1,12 @@
-from lm_utils import util as lm_util
-reload(lm_util)
-
 import os
 
 import maya.cmds as cmds
 import pymel.core as pm
 
 from PySide import QtGui, QtCore
+
+from lm_utils import util as lm_util
+reload(lm_util)
 
 class TabContent():
 
@@ -54,7 +54,7 @@ class TabContent():
         # Refresh button signal
         self.ui.btnRefresh.clicked.connect(self._refreshWidgets)
 
-        # Resfresh UI Signal on tabSide Chane(Outliner/Attr/Layers)
+        # Resfresh UI Signal on tabSide Channel(Outliner/Attr/Layers)
         self.ui.connect(self.ui.tabSide,
                     QtCore.SIGNAL('currentChanged(int)'),
                     self._refreshWidgets)
@@ -240,21 +240,18 @@ class TabContent():
         ### Light Remove Button
         self.remove_bt[lightShape] = QtGui.QPushButton(self.ui.scrActive)
         self.remove_bt[lightShape].setFixedSize(20, 20)
-        self.remove_bt[lightShape].setText("-")
 
-        remove_font = QtGui.QFont(self.remove_bt[lightShape].font())
-        remove_font.setPointSize(20)
-        remove_font.setBold(True)
-        remove_font.setWeight(30)
-
-        self.remove_bt[lightShape].setFont(remove_font)
-        self.remove_bt[lightShape].setStyleSheet("background-color: red")
         self.hboxLight[lightShape].addWidget(self.remove_bt[lightShape])
 
         currLayer = cmds.editRenderLayerGlobals(query= True, crl = True)
         if currLayer == 'defaultRenderLayer':
-            self.remove_bt[lightShape].setStyleSheet("background-color: black")
             self.remove_bt[lightShape].setEnabled(False)
+
+        iconPath = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         'icons',
+                         'removeIcon.png')
+
+        self.remove_bt[lightShape].setIcon(QtGui.QIcon(iconPath))
 
         # Signal
         self.remove_bt[lightShape].clicked.connect(lambda myLight=myLight \
@@ -646,25 +643,21 @@ class TabContent():
         return None
 
     def _updateLightLayersWidgets(self, rL, myLight, lightName, rlIndex):
-        btnText = "+"
-        btnColor = "background-color: green"
+        inconName = "addIcon.png"
         bgColor = "background-color: #c95758"
 
         if myLight in (cmds.editRenderLayerMembers(rL, q=True, fullNames=True) or []):
-            btnText = "-"
-            btnColor = "background-color: red"
+            inconName = "removeIcon.png"
             bgColor = "background-color: #587b99"
 
         if not rL in sorted(self.lightLayerBtn):
             self._createLightLayerWg(rL, myLight, lightName, rlIndex)
 
-        btn_font = QtGui.QFont(self.lightLayerBtn[rL].font())
-        btn_font.setPointSize(20)
-        btn_font.setBold(True)
-        btn_font.setWeight(30)
+        iconPath = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        'icons',
+                        inconName)
 
-        self.lightLayerBtn[rL].setText(btnText)
-        self.lightLayerBtn[rL].setStyleSheet(btnColor)
+        self.lightLayerBtn[rL].setIcon(QtGui.QIcon(iconPath))
 
         font = QtGui.QFont(self.lightLayerLabel[rL].font())
         font.setBold(True)
@@ -674,7 +667,6 @@ class TabContent():
         self.lightLayerLabel[rL].setStyleSheet(bgColor)
 
         return None
-
 
     ##########################################################################################
     #### LIGHT PRESETS

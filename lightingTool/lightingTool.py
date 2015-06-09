@@ -1,13 +1,14 @@
 import json
 import os
+import sys
+
+from PySide import QtGui, QtCore
 
 import hdrTab
 reload(hdrTab)
 
 import lightsTab
 reload(lightsTab)
-
-from PySide import QtGui, QtCore
 
 from lm_utils import util as lm_util
 reload(lm_util)
@@ -16,9 +17,8 @@ import lightingTool_form as lt_form
 reload(lt_form)
 
 class PublishDialog(QtGui.QDialog, lt_form.Ui_LightManagerForm):
-# class PublishDialog(QtGui.QDialog, form_class):
-    def __init__(self, parent=None, hdrPath=None):
-        super(PublishDialog, self).__init__(parent)
+    def __init__(self, parent=None, macFlag=False, hdrPath=None):
+        super(PublishDialog, self).__init__(parent, macFlag)
         self.setupUi(self)
         self.prefsFolder = os.path.join(os.environ["MAYA_APP_DIR"],
                                         "lightingToolPrefs")
@@ -59,8 +59,13 @@ class PublishDialog(QtGui.QDialog, lt_form.Ui_LightManagerForm):
                     "cbxRefresh": self.cbxRefresh.isChecked(),
                     "tabSide": self.tabSide.currentIndex(),
                     "lePath": self.lePath.text(),
-                    "btnRefresh": self.btnRefresh.isEnabled()
+                    "btnRefresh": self.btnRefresh.isEnabled(),
+                    "posX": self.x(),
+                    "posY": self.y(),
+                    "width": self.width(),
+                    "height": self.height()
                     }
+
         if not os.path.exists(self.prefsFolder):
             os.makedirs(self.prefsFolder)
 
@@ -81,6 +86,9 @@ class PublishDialog(QtGui.QDialog, lt_form.Ui_LightManagerForm):
         self.tabSide.setCurrentIndex(prefDict.get("tabSide", 0))
         self.lePath.setText(prefDict.get("lePath", ""))
         self.btnRefresh.setEnabled(prefDict.get("btnRefresh", False))
+        self.move(prefDict.get("posX", 740), prefDict.get("posY", 390))
+        self.resize(prefDict.get("width", self.width()),
+                    prefDict.get("height", self.height()))
 
         return None
 
@@ -100,7 +108,7 @@ class PublishDialog(QtGui.QDialog, lt_form.Ui_LightManagerForm):
             self.tbHdr = hdrTab.TabContent(self)
         elif tabLabel == "LIGHTS":
             ### Light Tab Content
-            self.tbLights = lightsTab.TabContent(self)
+            self.tabLights = lightsTab.TabContent(self)
 
         self.tabsLoaded.append(tabLabel)
 
@@ -118,13 +126,13 @@ class PublishDialog(QtGui.QDialog, lt_form.Ui_LightManagerForm):
             return
 
         if self.cbxRefresh.isChecked():
-            self.tbLights._refreshWidgets()
+            self.tabLights._refreshWidgets()
 
         return None
 
     def closeEvent(self, event):
         self._saveWindowPrefs()
-        self.tbLights.onClose()
+        self.tabLights.onClose()
 
         global ui
         ui = None
@@ -133,10 +141,14 @@ def main(hdrPath=None):
     if lm_util.arnoldIsRenderer() is False:
         return
 
-    global ui
-    if 'ui' in globals():
-        if ui is not None:
-            ui.close()
+    # If OSX we pass the tool flag to have the window parented to Maya as in Win
+    if sys.platform == "darwin":
+        macFlag = QtCore.Qt.Tool
+    else:
+        macFlag = False
 
-    ui = PublishDialog(parent=lm_util.getMayaWindow(), hdrPath=hdrPath)
+    parent = lm_util.getMayaWindowByName("lightingTool_ui")
+    ui = PublishDialog(parent=parent,
+                       macFlag=macFlag,
+                       hdrPath=hdrPath)
     ui.show()

@@ -11,35 +11,33 @@ import shiboken
 import maya.OpenMayaUI as apiUI
 
 def loadUi(uiFile):
-        """
-        Pyside lacks the "loadUiType" command, so we have to convert the ui file to py code in-memory first
-        and then execute it in a special frame to retrieve the form_class.
-        """
-        parsed = xml.parse(uiFile)
-        widget_class = parsed.find('widget').get('class')
-        form_class = parsed.find('class').text
+    parsed = xml.parse(uiFile)
+    widget_class = parsed.find('widget').get('class')
+    form_class = parsed.find('class').text
 
-        with open(uiFile, 'r') as f:
-            o = StringIO()
-            frame = {}
+    with open(uiFile, 'r') as f:
+        o = StringIO()
+        frame = {}
 
-            pysideuic.compileUi(f, o, indent=0)
-            pyc = compile(o.getvalue(), '<string>', 'exec')
-            exec pyc in frame
+        pysideuic.compileUi(f, o, indent=0)
+        pyc = compile(o.getvalue(), '<string>', 'exec')
+        exec pyc in frame
 
-            #Fetch the base_class and form class based on their type in the xml from designer
-            form_class = frame['Ui_%s' % form_class]
-            base_class = eval('QtGui.%s' % widget_class)
-        return form_class, base_class
+        form_class = frame['Ui_%s' % form_class]
+        base_class = eval('QtGui.%s' % widget_class)
 
-def getMayaWindow():
-    """
-    Get the main Maya window as a QtGui.QMainWindow instance
-    @return: QtGui.QMainWindow instance of the top level Maya windows
-    """
-    ptr = apiUI.MQtUtil.mainWindow()
-    if ptr is not None:
-        return shiboken.wrapInstance(long(ptr), QtGui.QWidget)
+    return form_class, base_class
+
+def getMayaWindowByName(mayaDialog):
+    if cmds.window(mayaDialog, exists=True):
+        cmds.deleteUI(mayaDialog, window=True)
+
+    maya_win_name = cmds.window(mayaDialog)
+
+    parent_win_pointer = apiUI.MQtUtil.findWindow(maya_win_name)
+    parent_win = shiboken.wrapInstance(long(parent_win_pointer), QtGui.QWidget)
+
+    return parent_win
 
 def toQtObject(mayaName):
     '''
@@ -70,7 +68,7 @@ def createLocator(locatorType, asLight=False):
 
     return (shapeName, lName)
 
-def getSelectedLight(lightType):
+def getSelectedLight(lightType, validTypes):
     userSel = cmds.ls(sl=True)
     if not userSel:
         return False
@@ -79,20 +77,23 @@ def getSelectedLight(lightType):
     if not objRel:
         return False
 
-    lightShape = [x for x in objRel if cmds.nodeType(objRel) == lightType]
+    lightShape = [x for x in objRel if cmds.nodeType(objRel) in validTypes]
 
     if not lightShape:
         return False
 
     return lightShape[0]
 
-def loadFileToLight(filePath, lightType):
-    # If Skydome selected load file to this light
-    lightShape = getSelectedLight(lightType)
+def loadFileToLight(filePath, lightType, validTypes):
+    # If Light selected: load file to this light (ony valid Types)
+    lightShape = getSelectedLight(lightType, validTypes)
 
-    #If not create an Skydomde
+    #If not create a light based on lightType preset
     if not lightShape:
         lightShape, lightName = createLocator(lightType, asLight=False)
+        newLight = True
+    else:
+        newLight = False
 
     fileNode = cmds.shadingNode("file", asTexture=True, isColorManaged=True)
     placeNode = cmds.shadingNode("place2dTexture", asUtility=True)
@@ -111,13 +112,18 @@ def loadFileToLight(filePath, lightType):
 
     cmds.setAttr("%s.fileTextureName" % fileNode, filePath, type="string")
 
-    fileRes = int(cmds.getAttr('%s.outSizeX' % fileNode))
-    cmds.setAttr("%s.resolution" % lightShape, fileRes)
+    # Set resolution if Skydome
+    if lightType == "aiSkyDomeLight":
+        fileRes = int(cmds.getAttr('%s.outSizeX' % fileNode))
+        # FIXME: Some files return 0 as resolution. Needs to be looked at
+        if fileRes > 0:
+            cmds.setAttr("%s.resolution" % lightShape, fileRes)
 
-    # Select the SkyDome Light
-    cmds.select(cmds.listRelatives(lightShape, parent =True)[0])
+    # Select the new Light
+    loadLight = cmds.listRelatives(lightShape, parent =True)[0]
+    cmds.select(loadLight)
 
-    return None
+    return newLight, loadLight
 
 def getSceneLights(layer=False):
     '''

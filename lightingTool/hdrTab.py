@@ -1,14 +1,13 @@
-from lm_utils import util as lm_util
-reload(lm_util)
-
 import os
 import datetime
 
 from PySide import QtGui, QtCore
 
+from lm_utils import util as lm_util
+reload(lm_util)
+
 class TabContent():
     def __init__(self, ui):
-
         self.ui = ui
 
         self.mainFolder = self.ui.lePath.text()
@@ -30,6 +29,10 @@ class TabContent():
         self.ui.connect(self.ui.btnLoad,
                     QtCore.SIGNAL('clicked()'),
                     self._loadHDRI)
+
+        ## Fill Load Preset Combo
+        self.loadPresets = ["aiSkyDomeLight", "aiAreaLight", "areaLight"]
+        self.ui.cbLoadPreset.addItems(self.loadPresets)
 
     ##########################################################################################
     #### HDRI FOLDERS
@@ -269,6 +272,7 @@ class TabContent():
     def _exploreHdri(self):
         if self.hdrSel is None:
             return None
+
         hdriFolder = os.path.dirname(self.hdrSel)
 
         if not os.path.exists(hdriFolder):
@@ -299,7 +303,9 @@ class TabContent():
         self.ui.leDateMod.setText(fileData["dateModified"])
         self.ui.leFileSize.setText(fileData["fileSize"])
         self.ui.leResolution.setText(fileData["fileRes"])
-        print 'caca'
+
+        self.ui.btnLoad.setEnabled(True)
+        self.ui.btnLoad.setStyleSheet("background-color: #005500")
 
         return None
 
@@ -309,6 +315,17 @@ class TabContent():
             print "%s does not exist" % filePath
             return None
 
-        lm_util.loadFileToLight(filePath, "aiSkyDomeLight")
+        lightPreset = self.ui.cbLoadPreset.currentText()
+        validTypes = self.loadPresets
+
+        newLight, loadLight = lm_util.loadFileToLight(filePath,
+                                                      lightPreset,
+                                                      validTypes)
+        if newLight:
+            lm_util.displayMessageBox("Maya Lighting Tool",
+                "Image Loaded to new CREATED Light - [ %s ]" % loadLight)
+        else:
+            lm_util.displayMessageBox("Maya Lighting Tool",
+                "Image Loaded to existing SELECTED Light - [ %s ]" % loadLight)
 
         return None
