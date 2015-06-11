@@ -6,7 +6,9 @@ import lightingTool
 
 lightingTool.main()
 
--- Setting the HDR Folder Path:
+-------
+
+Setting the HDR Folder Path:
 
 Option 1: Set the path when calling the main function
 
