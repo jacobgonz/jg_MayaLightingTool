@@ -9,7 +9,6 @@ from lm_utils import util as lm_util
 reload(lm_util)
 
 class TabContent():
-
     def __init__(self, ui):
         self.ui = ui
         self.sel_lbt, lightShape = self._getSelectedLight()
@@ -149,7 +148,7 @@ class TabContent():
         self.ui.cbLayers.blockSignals(True)
         rLayer = str(self.ui.cbLayers.currentText())
 
-        if not cmds.objExists(rLayer):
+        if not cmds.objExists(rLayer) or cmds.nodeType(rLayer) != "renderLayer":
             cmds.warning("The %s render Layes does not exist" % rLayer)
             return False
 
@@ -293,7 +292,9 @@ class TabContent():
         int_values = ['%s.intensity' % lightShape, 'I']
         exp_values = ['%s.aiExposure' % lightShape, 'E']
 
-        self._addAttrWidget(self.hboxLight[lightShape], self.ui.scrActive, vis_values)
+        self._addAttrWidget(self.hboxLight[lightShape],
+                            self.ui.scrActive,
+                            vis_values)
 
         self._addAttrWidget(self.hboxLight[lightShape], self.ui.scrActive,
                                     color_values,
@@ -381,10 +382,18 @@ class TabContent():
 
         if rL is None:
             rL = cmds.editRenderLayerGlobals(query= True,
-                                                      currentRenderLayer = True)
+                                              currentRenderLayer = True)
+
+        # Check if the renderLayer exists
+        if not cmds.objExists(rL) or cmds.nodeType(rL) != "renderLayer":
+            cmds.warning("Render Layer %s does not exist. Upade UI first" % rL)
+            return None
+
         # FIXME: workaround for add/remove buttons on lighLayersTab/ must revise
         if remove == "check":
-            remove = (myLight in (cmds.editRenderLayerMembers(rL, q=True, fullNames=True) or []))
+            remove = (myLight in (cmds.editRenderLayerMembers(rL,
+                                    q=True,
+                                    fullNames=True) or []))
 
         if not allLayers:
             rLayers = [rL]
@@ -475,7 +484,10 @@ class TabContent():
                         ['%s.aiIndirect' % lightShape, 'Indirect']]
 
         for param in emit_values:
-            self._addAttrWidget(lyAttrLight, self.ui.scrAttr, param, attr_type='cbx')
+            self._addAttrWidget(lyAttrLight,
+                                self.ui.scrAttr,
+                                param,
+                                attr_type='cbx')
 
         if lightType == "mesh":
 
@@ -489,11 +501,13 @@ class TabContent():
 
             for param in contr_values:
                 self._addAttrWidget(lyAttrLight, None, param,
-                                    attr_type='floatSliderMesh', size=[40, 40, 5])
+                                    attr_type='floatSliderMesh',
+                                    size=[40, 40, 5])
 
-            self._addAttrWidget(lyAttrLight, self.ui.scrlyAttr, max_values,
-                    attr_type='float2Col',
-                    size=[80, 45])
+            self._addAttrWidget(lyAttrLight, self.ui.scrlyAttr,
+                                max_values,
+                                attr_type='float2Col',
+                                size=[80, 45])
 
         else:
             self._addLine(lyAttrLight)
@@ -529,19 +543,29 @@ class TabContent():
             self._addLine(lyAttrLight)
 
             for param in contr_values:
-                self._addAttrWidget(lyAttrLight, self.ui.scrlyAttr, param,
-                                    attr_type='floatSlider', size=[40, 40, 30, 5])
+                self._addAttrWidget(lyAttrLight,
+                                    self.ui.scrlyAttr,
+                                    param,
+                                    attr_type='floatSlider',
+                                    size=[40, 40, 30, 5])
 
-            self._addAttrWidget(lyAttrLight, self.ui.scrlyAttr, max_values,
-                                attr_type='floatSlider', size=[80, 45, 5, 5])
+            self._addAttrWidget(lyAttrLight,
+                                self.ui.scrlyAttr,
+                                max_values,
+                                attr_type='floatSlider',
+                                size=[80, 45, 5, 5])
 
         self._addLine(lyAttrLight)
         norm_values = ["%s.aiNormalize" % lightShape, 'Normalize']
-        self._addAttrWidget(lyAttrLight, self.ui.scrlyAttr, norm_values,
+        self._addAttrWidget(lyAttrLight,
+                            self.ui.scrlyAttr,
+                            norm_values,
                             attr_type='cbx')
 
         shad_values = ["%s.aiCastShadows" % lightShape, 'Cast Shadows']
-        self._addAttrWidget(lyAttrLight, self.ui.scrlyAttr, shad_values,
+        self._addAttrWidget(lyAttrLight,
+                            self.ui.scrlyAttr,
+                            shad_values,
                             attr_type='cbx')
         self._addLine(lyAttrLight)
 
@@ -601,7 +625,10 @@ class TabContent():
 
         for rL in rLayers:
             self._createLightLayerWg(rL, myLight, lightName, rLayers.index(rL))
-            self._updateLightLayersWidgets(rL, myLight, lightName, rLayers.index(rL))
+            self._updateLightLayersWidgets(rL,
+                                           myLight,
+                                           lightName,
+                                           rLayers.index(rL))
 
         return None
 
@@ -670,7 +697,7 @@ class TabContent():
 
         return None
 
-    ##########################################################################################
+    ############################################################################
     #### LIGHT PRESETS
 
     def _lightPresets(self):
@@ -988,8 +1015,9 @@ class TabContent():
 
         scnLightShapes = lm_util.getSceneLights()[2]
         for lightShape in scnLightShapes:
-            lightTrans = cmds.listRelatives(lightShape, parent=True,
-                                                        fullPath=True)[0]
+            lightTrans = cmds.listRelatives(lightShape,
+                                            parent=True,
+                                            fullPath=True)[0]
             if lightTrans == lastObj:
                 sel_light = lastObj
                 sel_lightShape = lightShape
@@ -997,7 +1025,7 @@ class TabContent():
         return sel_light, sel_lightShape
 
     def _addAttrWidget(self, layout, lyParent, values, attr_type='cbx',
-                                                size=[10, 60, 40, 80]):
+                            size=[10, 60, 40, 80]):
         if not cmds.objExists(values[0]):
             return False
 

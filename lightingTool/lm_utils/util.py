@@ -104,7 +104,9 @@ def loadFileToLight(filePath, lightType, validTypes):
                     "vertexUvThree", "vertexCameraOne"]
 
     for value in conPlace2File:
-        cmds.connectAttr("%s.%s" % (placeNode, value), "%s.%s" % (fileNode, value), force=True)
+        cmds.connectAttr("%s.%s" % (placeNode, value),
+                         "%s.%s" % (fileNode, value),
+                         force=True)
 
     cmds.connectAttr("%s.outUV" % placeNode,  "%s.uv" % fileNode)
     cmds.connectAttr("%s.outUvFilterSize" % placeNode,  "%s.uvFilterSize" % fileNode)

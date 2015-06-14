@@ -1,6 +1,9 @@
 import os
 import datetime
 
+import subprocess
+import sys
+
 from PySide import QtGui, QtCore
 
 from lm_utils import util as lm_util
@@ -10,21 +13,14 @@ class TabContent():
     def __init__(self, ui):
         self.ui = ui
 
-        self.mainFolder = self.ui.lePath.text()
-        getHdrFolders = self._hdrFoldersLayout()
+        self._addTabContent()
 
-        if getHdrFolders:
-            # Signal - Explore Folder
-            self.ui.connect(self.ui.btnPathExplore,
-                        QtCore.SIGNAL('clicked()'),
-                        lambda folderPath = self.mainFolder:
-                        self._exploreFolder(folderPath))
+        # Signal - Explore Folder
+        self.ui.connect(self.ui.btnPathExplore,
+                    QtCore.SIGNAL('clicked()'),
+                    self._exploreFolder)
 
         self.hdrSel = None
-
-        self.ui.connect(self.ui.btnExplore,
-                    QtCore.SIGNAL('clicked()'),
-                    self._exploreHdri)
 
         self.ui.connect(self.ui.btnLoad,
                     QtCore.SIGNAL('clicked()'),
@@ -34,12 +30,22 @@ class TabContent():
         self.loadPresets = ["aiSkyDomeLight", "aiAreaLight", "areaLight"]
         self.ui.cbLoadPreset.addItems(self.loadPresets)
 
-    ##########################################################################################
+        self.ui.connect(self.ui.btnExplore,
+                    QtCore.SIGNAL('clicked()'),
+                    self._exploreHdri)
+
+        self.ui.connect(self.ui.btnRefreshHdr,
+                    QtCore.SIGNAL('clicked()'),
+                    self._addTabContent)
+
+        self.ui.lePath.returnPressed.connect(self._addTabContent)
+
+    ############################################################################
     #### HDRI FOLDERS
 
     def _hdrFoldersLayout(self):
         if not self.mainFolder:
-            return
+            return False
 
         self.hdriFiles = self._getHdriDict(self.mainFolder)
         if not self.hdriFiles:
@@ -50,6 +56,9 @@ class TabContent():
         return True
 
     def _hdrFolderContents(self):
+        # Clear the layout first
+        self._clearLayout(self.ui.lyHdr)
+
         ### VARIABLES
         self.folderViewBtn = {}
         self.folderBtn = {}
@@ -114,9 +123,9 @@ class TabContent():
             self.thumbsWg[hdrFolder].hide()
 
         spacerContent = QtGui.QSpacerItem(1,
-                                        350,
-                                        QtGui.QSizePolicy.Fixed,
-                                        QtGui.QSizePolicy.Maximum)
+                                        1,
+                                        QtGui.QSizePolicy.Expanding,
+                                        QtGui.QSizePolicy.Expanding)
 
         self.ui.lyHdr.addItem(spacerContent)
 
@@ -184,6 +193,12 @@ class TabContent():
 
         return None
 
+    def _addTabContent(self):
+        self.mainFolder = self.ui.lePath.text()
+        self._hdrFoldersLayout()
+
+        return None
+
     def _addRowSpacer(self, hBox):
 
         spacerRow = QtGui.QSpacerItem(500,
@@ -223,6 +238,9 @@ class TabContent():
         return dateCreated, dateModified
 
     def _getHdriDict(self, mainFolder):
+        if not os.path.exists(mainFolder):
+            return
+
         hdriDict = {}
 
         for typeFolder in os.listdir(mainFolder):
@@ -230,8 +248,12 @@ class TabContent():
             if os.path.isfile(folderPath):
                 continue
 
-            hdrFiles = [x for x in os.listdir(folderPath) \
-                        if x.endswith(".exr") or x.endswith(".hdr")]
+            # Catch Windows error when accesing acces denied dirs
+            try:
+                hdrFiles = [x for x in os.listdir(folderPath) \
+                            if x.endswith(".exr") or x.endswith(".hdr")]
+            except:
+                print "File acces denied: %s" % folderPath
 
             hdriDict[typeFolder] = hdrFiles
 
@@ -253,11 +275,37 @@ class TabContent():
 
         return thumbPath
 
+    def _clearLayout(self, layout):
+
+        if layout is not None:
+            while layout.count():
+                child = layout.takeAt(0)
+                if child.widget() is not None:
+                    child.widget().deleteLater()
+                elif child.layout() is not None:
+                    self._clearLayout(child.layout())
+
+        return None
+
     ##########################################################################################
     ### MAIN SIGNALS
 
-    def _exploreFolder(self, folderPath):
-        os.system('start %s' % folderPath)
+    def _exploreFolder(self, folderPath=None):
+        if folderPath is None:
+            folderPath = self.mainFolder
+
+        if not os.path.exists(folderPath):
+            print '%s does not exist' % folderPath
+            return None
+
+        if sys.platform == "darwin":
+            subprocess.call(["open", "-R", folderPath])
+        elif sys.platform == "win32":
+            os.system('start %s' % folderPath)
+        elif sys.platform == "linux2":
+            subprocess.Popen(['xdg-open', folderPath])
+        else:
+            print "Explore folder not implemented for this OS"
 
         return None
 
@@ -274,18 +322,13 @@ class TabContent():
             return None
 
         hdriFolder = os.path.dirname(self.hdrSel)
-
-        if not os.path.exists(hdriFolder):
-            return None
-
-        os.system('start %s' % hdriFolder)
+        self._exploreFolder(hdriFolder)
 
         return None
 
     def _setLoadImage(self, thumbPath, filePath, selBtn):
         for hdrFile in sorted(self.thumbIcon):
             self.thumbIcon[hdrFile].setStyleSheet("background-color: #52869e")
-            print hdrFile
 
         selBtn.setStyleSheet("background-color: #d93939")
 

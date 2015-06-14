@@ -17,9 +17,13 @@ import lightingTool_form as lt_form
 reload(lt_form)
 
 class PublishDialog(QtGui.QDialog, lt_form.Ui_LightManagerForm):
-    def __init__(self, parent=None, macFlag=False, hdrPath=None):
-        super(PublishDialog, self).__init__(parent, macFlag)
+    def __init__(self, parent=None, winFlag=False, hdrPath=None):
+        super(PublishDialog, self).__init__(parent, winFlag)
         self.setupUi(self)
+
+        # Force Close/Minimize button for linux window
+        self.setWindowFlags(winFlag | QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowMinimizeButtonHint)
+
         self.prefsFolder = os.path.join(os.environ["MAYA_APP_DIR"],
                                         "lightingToolPrefs")
         self.prefsFile = os.path.join(self.prefsFolder,
@@ -143,12 +147,12 @@ def main(hdrPath=None):
 
     # If OSX we pass the tool flag to have the window parented to Maya as in Win
     if sys.platform == "darwin":
-        macFlag = QtCore.Qt.Tool
+        winFlag = QtCore.Qt.Tool
     else:
-        macFlag = False
+        winFlag = QtCore.Qt.Window
 
     parent = lm_util.getMayaWindowByName("lightingTool_ui")
     ui = PublishDialog(parent=parent,
-                       macFlag=macFlag,
+                       winFlag=winFlag,
                        hdrPath=hdrPath)
     ui.show()
