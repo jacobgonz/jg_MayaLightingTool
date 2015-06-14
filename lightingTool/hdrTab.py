@@ -303,7 +303,7 @@ class TabContent():
         elif sys.platform == "win32":
             os.system('start %s' % folderPath)
         elif sys.platform == "linux2":
-            subprocess.Popen(['xdg-open', folderPath])
+            os.system('nautilus %s' % folderPath)
         else:
             print "Explore folder not implemented for this OS"
 
