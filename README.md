@@ -34,5 +34,5 @@ Please note that the file resolution field is not supported yet. At the moment I
 
 Maya Version and OS 
 It has been tested mainly Windows and Mac OSX using Maya 2015.
-Not tested in Linux yet.
+Linux Centos 6.2 - Maya 2015
 
