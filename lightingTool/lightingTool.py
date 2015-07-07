@@ -105,6 +105,8 @@ class PublishDialog(QtGui.QDialog, lt_form.Ui_LightManagerForm):
 
     def _loadTabContent(self, tabLabel):
         if tabLabel in self.tabsLoaded:
+            if tabLabel == "LIGHTS":
+                self.tabLights._refreshWidgets()
             return
 
         if tabLabel == "HDRI":
@@ -126,7 +128,10 @@ class PublishDialog(QtGui.QDialog, lt_form.Ui_LightManagerForm):
         return None
 
     def enterEvent(self, event):
-        if "LIGHTS" not in self.tabsLoaded:
+        # GetCurrentTab Label
+        tabIndex = self.tabMain.currentIndex()
+        tabLabel = self.tabMain.tabText(tabIndex)
+        if tabLabel != "LIGHTS":
             return
 
         if self.cbxRefresh.isChecked():

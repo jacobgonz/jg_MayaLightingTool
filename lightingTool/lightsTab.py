@@ -11,7 +11,6 @@ reload(lm_util)
 class TabContent():
     def __init__(self, ui):
         self.ui = ui
-        self.sel_lbt, lightShape = self._getSelectedLight()
 
         # Variables
         self.lightAttrW = {}
@@ -28,6 +27,10 @@ class TabContent():
                     QtCore.SIGNAL("currentIndexChanged(int)"),
                     self._rLayerSwitch)
 
+        self.scn_lights, self.rl_lights, self.rl_lights_list, self.scn_lights_list = lm_util.getSceneLights()
+
+        self.sel_lbt, lightShape = self._getSelectedLight()
+
         ### Fill Lights Tab
         self._activeLightsLayout()
         self._lightPresets()
@@ -40,6 +43,7 @@ class TabContent():
 
         currLayer = cmds.editRenderLayerGlobals(currentRenderLayer =True,
                                                 query = True)
+
         # Add to Layer Button signal
         self.ui.btnAddLayer.clicked.connect(lambda btName ='add' : \
                                             self._rlLayer_bt(btName))
@@ -56,7 +60,7 @@ class TabContent():
         # Resfresh UI Signal on tabSide Channel(Outliner/Attr/Layers)
         self.ui.connect(self.ui.tabSide,
                     QtCore.SIGNAL('currentChanged(int)'),
-                    self._refreshWidgets)
+                    lambda : self._refreshWidgets(False))
 
         # Add Script Job
         self._createScriptJobs()
@@ -119,12 +123,9 @@ class TabContent():
     def _getRenderLayers(self):
         # TODO: review avoiding more than one defaultRenderLayer
         rLayers = [x for x in cmds.ls(type='renderLayer') \
-                    if not x.endswith(":defaultRenderLayer")]
+                    if "defaultRenderLayer" not in x]
 
-        ## Hack to have default layer at bottom
-        if "defaultRenderLayer" in rLayers:
-            rLayers.remove("defaultRenderLayer")
-            rLayers.append("defaultRenderLayer")
+        rLayers.append("defaultRenderLayer")
 
         return rLayers
 
@@ -162,7 +163,6 @@ class TabContent():
     #### ACTIVE LIGHTS
 
     def _activeLightsLayout(self):
-        self.scn_Lights = lm_util.getSceneLights(layer=False)[0]
 
         # Variables to store UI widgets
         self.remove_bt = {}
@@ -183,7 +183,7 @@ class TabContent():
         self.light_label = {}
 
         ## Make sure 'Root' is the first element in the list
-        groupList = list(self.scn_Lights.keys())
+        groupList = list(self.scn_lights.keys())
 
         if 'Root' in groupList:
             groupList.remove('Root')
@@ -194,7 +194,7 @@ class TabContent():
             self._addGroupToActive(myGr)
 
             # Add lights for this group
-            for lightShape in self.scn_Lights[myGr]:
+            for lightShape in self.scn_lights[myGr]:
                 myLight = "|".join(lightShape.split("|")[0:-1])
 
                 self._addLightToActive(myLight, lightShape, myGr)
@@ -230,8 +230,6 @@ class TabContent():
         if myGr not in sorted(self.grpW):
             self._addGroupToActive(myGr)
             self._addSpacerToActivefunction()
-
-        self.rl_lights = lm_util.getSceneLights(layer=True)[0]
 
         lightName = cmds.listRelatives(lightShape, parent=True)[0]
 
@@ -405,6 +403,7 @@ class TabContent():
                                         noRecurse=True)
 
         ## Refresh UI Widgets
+        # TODO: update lights variables internally to gain speed
         self._refreshWidgets()
 
         return None
@@ -588,7 +587,7 @@ class TabContent():
 
         lightName = "|".join(lightShape.split("|")[0:-1])
 
-        if lightName in lm_util.getSceneLights(layer=True)[1]:
+        if lightName in self.rl_lights_list:
             self.ui.scrlyAttr.setVisible(True)
         else:
             self.ui.scrlyAttr.setVisible(False)
@@ -791,7 +790,7 @@ class TabContent():
                 cmds.setAttr("%s.aiTranslator" % meshShape[0],
                              'mesh_light',
                              type="string")
-                newLight = userSel
+                newLight = userSel[0]
 
             else:
                 newLight = self._createLocator(lightName, asLight=True)[1]
@@ -808,7 +807,12 @@ class TabContent():
         lm_util.createLightGrpAttr(lightShape)
 
         ## Add Light to UI
+        # Update rl_lights variable - revise if needed
+
+        self.rl_lights = lm_util.getSceneLights()[1]
+
         self._addLightToActive(newLight, lightShape, 'Root')
+
         self._refreshWidgets()
 
         return newLight
@@ -841,7 +845,7 @@ class TabContent():
     ############################################################################
     #### LIGHTS OUTLINER
 
-    def _lightsOutliner(self, refresh=False):
+    def _lightsOutliner(self):
         self._lightsOutlinerContent()
         __sortingEnabled = self.ui.trOutliner.isSortingEnabled()
         self.ui.trOutliner.setSortingEnabled(__sortingEnabled)
@@ -849,13 +853,9 @@ class TabContent():
         return None
 
     def _lightsOutlinerContent(self):
-        # # Leave the function if no lights in the scene
-        # if not self.scn_Lights:
-        #     return
 
-        self.sl_Lights = lm_util.getSceneLights()[0]
-        if not self.sl_Lights:
-            self.sl_Lights['Root'] = []
+        if not self.scn_lights:
+            self.scn_lights['Root'] = []
 
         # First clear the tree
         self.ui.trOutliner.clear()
@@ -868,7 +868,7 @@ class TabContent():
                         self._selectLightsFromTree)
 
         # Make sure 'Root' is the first element in the list
-        groupList = list(self.sl_Lights.keys())
+        groupList = list(self.scn_lights.keys())
         if 'Root' in groupList:
             groupList.remove('Root')
             groupList.insert(0, 'Root')
@@ -876,10 +876,10 @@ class TabContent():
         for myGrp in groupList:
             item_0 = QtGui.QTreeWidgetItem(self.ui.trOutliner)
             self.ui.trOutliner.topLevelItem(groupList.index(myGrp)).setText(0, myGrp)
-            item_0.setFlags(QtCore.Qt.ItemIsDragEnabled|QtCore.Qt.ItemIsUserCheckable|QtCore.Qt.ItemIsEnabled)
+            item_0.setFlags(QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
             self.ui.trOutliner.expandItem(item_0)
 
-            for lightShape in self.sl_Lights[myGrp]:
+            for lightShape in self.scn_lights[myGrp]:
 
                 lightName = cmds.listRelatives(lightShape, parent=True)[0]
                 myLight = "|".join(lightShape.split("|")[0:-1])
@@ -887,7 +887,7 @@ class TabContent():
                 self.treeItems[myLight] = QtGui.QTreeWidgetItem(item_0)
                 self.treeLightShapes.append(lightShape)
 
-                self.ui.trOutliner.topLevelItem(groupList.index(myGrp)).child(self.sl_Lights[myGrp].index(lightShape)).setText(0, lightName)
+                self.ui.trOutliner.topLevelItem(groupList.index(myGrp)).child(self.scn_lights[myGrp].index(lightShape)).setText(0, lightName)
                 lightType = cmds.objectType(lightShape)
                 iconPath = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                             'icons',
@@ -962,7 +962,7 @@ class TabContent():
 
             currLayer = cmds.editRenderLayerGlobals(query= True, crl = True)
             rLayers = [x for x in cmds.ls(type='renderLayer') \
-                                     if x != 'defaultRenderLayer']
+                                     if 'defaultRenderLayer' not in x]
 
             if currLayer == 'defaultRenderLayer':
                 return False
@@ -988,10 +988,6 @@ class TabContent():
     # ##########################################################################
     ### MAIN FUNCTIONS
 
-    def _sceneLightsUpdates(self):
-        if set(self.scn_Lights) != set(lm_util.getSceneLights()[2]):
-            return True
-
     def _lightOnCurrentLayer(self, myLight):
         currLayer = cmds.editRenderLayerGlobals(query= True, crl = True)
         currLy_objs = cmds.editRenderLayerMembers(currLayer, query=True,
@@ -1013,8 +1009,7 @@ class TabContent():
         sel_light = False
         sel_lightShape = False
 
-        scnLightShapes = lm_util.getSceneLights()[2]
-        for lightShape in scnLightShapes:
+        for lightShape in self.scn_lights_list:
             lightTrans = cmds.listRelatives(lightShape,
                                             parent=True,
                                             fullPath=True)[0]
@@ -1081,9 +1076,9 @@ class TabContent():
 
         return None
 
-    def _refreshWidgets(self):
-        self.snc_lights = lm_util.getSceneLights(layer=False)[0]
-        self.rl_Lights = lm_util.getSceneLights(layer=True)[0]
+    def _refreshWidgets(self, getLights=True):
+        if getLights:
+            self.scn_lights, self.rl_lights, self.rl_lights_list, self.scn_lights_list = lm_util.getSceneLights()
 
         #Update render Layers Combo
         self.ui.cbLayers.blockSignals(True)
@@ -1099,7 +1094,7 @@ class TabContent():
         showLights = []
         showGrps = []
 
-        for myGr, onLights in self.rl_Lights.iteritems():
+        for myGr, onLights in self.rl_lights.iteritems():
             showGrps.append(myGr)
             for light in onLights:
                 showLights.append(light)
@@ -1128,7 +1123,7 @@ class TabContent():
 
         ## Check if they are new lights/Groups in the scene - add them to the UI
         newGrps = False
-        for myGr, onLights in self.snc_lights.iteritems():
+        for myGr, onLights in self.scn_lights.iteritems():
             if myGr not in sorted(self.grpW):
                 # Add the group
                 self._addGroupToActive(myGr)
@@ -1145,10 +1140,10 @@ class TabContent():
 
         ### Check scn lighs count against UI lights count
         # If not the same refresh UI Tree Outliner - !!
-        if set(self.treeLightShapes) != set(lm_util.getSceneLights()[2]):
+        if set(self.treeLightShapes) != set(self.scn_lights_list):
             self._lightsOutlinerContent()
 
-        ### Refresh Channel Box - Entry Colors and selected Lighs
+        ### Refresh Entry Colors and selected Lighs
         scnSel = cmds.ls(sl=True, long=True)
         for myLight in self.treeItems.keys():
             self._setTreeEntryColor(myLight, self.treeItems[myLight])
@@ -1159,8 +1154,9 @@ class TabContent():
         # Update selected Light on Active and Attr Editor
         self.sel_lbt, selShape = self._getSelectedLight()
         if selShape in sorted(self.hboxLight):
-            self._updateAttrEditor(selShape)
             self._highlightSelLight(selShape)
+
+            self._updateAttrEditor(selShape)
 
         # Upate Light Layers Tab
         if selShape:
@@ -1185,7 +1181,6 @@ class TabContent():
         return self.scriptJobs
 
     def _updateRenderLayer(self):
-        self.rl_Lights = lm_util.getSceneLights(layer=True)[0]
 
         ## Refresh UI Widgets
         self._refreshWidgets()

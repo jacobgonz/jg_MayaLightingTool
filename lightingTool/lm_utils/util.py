@@ -127,66 +127,56 @@ def loadFileToLight(filePath, lightType, validTypes):
 
     return newLight, loadLight
 
+#NEW getSceneLights
+
 def getSceneLights(layer=False):
     '''
-    This function returns:
+        This function returns:
     - [0] a dict of lights and their group parent (if any) inside the scene : l_dict
-    - [1] a list of lights used on the current layer: rl_lights
-    - [2] a list of all lights inside the scene: scnLights
+    - [1] l_dict but filered by lights inside the current Layer: layer_l_dict
+    - [2] a list of lights used on the current layer: rl_lights
+    - [3] a list of all lights inside the scene: scnLights
 
     - Need to look at simplyfing this code
-    - Need to add support for mesh lights
     '''
 
-    ### Lights accepted
-    lightTypes = ['directionalLight', 'pointLight', 'spotLight', 'areaLight',
-            'aiAreaLight', 'aiSkyDomeLight', 'aiPhotometricLight']
-
     ## Variables
+    l_dict = {}
+    layer_l_dict = {}
     rl_lights = []
     scn_Lights = []
-    l_dict = {}
 
-    for l_type in lightTypes:
-        for l in cmds.ls(type=l_type, long=True):
-            scn_Lights.append(l)
+    scn_Lights = cmds.ls(type=["light"] + cmds.listNodeTypes("light"), long=True)
 
     ## Add mesh Lights to scn_Lights list
-    for meshNode in cmds.ls(type="mesh", long=True):
-        if cmds.getAttr("%s.aiTranslator" % meshNode) == 'mesh_light':
-            scn_Lights.append(meshNode)
-    if not scn_Lights:
-        return l_dict, rl_lights, scn_Lights
+    ## FIXME: review this - is making the updates really slow!!!
+    # for meshNode in cmds.ls(type="mesh", long=True):
+    #     if cmds.getAttr("%s.aiTranslator" % meshNode) == "mesh_light":
+    #         scn_Lights.append(meshNode)
 
     currLayer = cmds.editRenderLayerGlobals(query= True, crl = True)
-    currLy_objs = cmds.editRenderLayerMembers(currLayer, query=True, fullNames=True)
-
-    if layer and not currLy_objs:
-        return l_dict, rl_lights, scn_Lights
+    currLy_objs = cmds.editRenderLayerMembers(currLayer,
+                                              query=True,
+                                              fullNames=True) or []
 
     for l in scn_Lights:
         l_obj = "|".join(l.split("|")[0:-1])
-        l_parent = "|".join(l.split("|")[0:-2])
+        l_parent = "|".join(l.split("|")[0:-2]) or 'Root'
 
-        if not l_parent:
-            l_parent = 'Root'
-
-        if layer and currLy_objs:
-            if l_obj in currLy_objs:
-                rl_lights.append(l_obj)
-
-                if l_parent not in l_dict.keys():
-                    l_dict[l_parent] = [l]
-                else:
-                    l_dict[l_parent].append(l)
+        if l_parent not in l_dict.keys():
+            l_dict[l_parent] = [l]
         else:
-            if l_parent not in l_dict.keys():
-                l_dict[l_parent] = [l]
+            l_dict[l_parent].append(l)
+
+        if l_obj in currLy_objs:
+            rl_lights.append(l_obj)
+
+            if l_parent not in layer_l_dict.keys():
+                layer_l_dict[l_parent] = [l]
             else:
-                l_dict[l_parent].append(l)
+                layer_l_dict[l_parent].append(l)
 
-    return l_dict, rl_lights, scn_Lights
-
+    return l_dict, layer_l_dict, rl_lights, scn_Lights
 
 def createLightGrpAttr(lightShape):
     attrName = "mtoa_constant_lightGroup"
