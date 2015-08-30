@@ -143,8 +143,7 @@ class PublishDialog(QtGui.QDialog, lt_form.Ui_LightManagerForm):
         self._saveWindowPrefs()
         self.tabLights.onClose()
 
-        global ui
-        ui = None
+        lm_util.deleteMayawindow('lightingTool_ui')
 
 def main(hdrPath=None):
     if lm_util.arnoldIsRenderer() is False:

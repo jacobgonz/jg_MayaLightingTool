@@ -28,6 +28,16 @@ def loadUi(uiFile):
 
     return form_class, base_class
 
+def mayaWindowExists(mayaDialog):
+
+    return cmds.window(mayaDialog, exists=True)
+
+def deleteMayawindow(mayaDialog):
+    if mayaWindowExists(mayaDialog):
+        cmds.deleteUI(mayaDialog)
+
+    return None
+
 def getMayaWindowByName(mayaDialog):
     if cmds.window(mayaDialog, exists=True):
         cmds.deleteUI(mayaDialog, window=True)
@@ -146,15 +156,23 @@ def getSceneLights(layer=False):
     rl_lights = []
     scn_Lights = []
 
-    scn_Lights = cmds.ls(type=["light"] + cmds.listNodeTypes("light"), long=True)
+    lightTypes = ['aiAreaLight',
+                  'aiPhotometricLight',
+                  'aiSkyDomeLight',
+                  'areaLight',
+                  'pointLight',
+                  'spotLight',
+                  'volumeLight']
+
+    scn_Lights = cmds.ls(type=["light"] + lightTypes, long=True)
 
     ## Add mesh Lights to scn_Lights list
     ## FIXME: review this - is making the updates really slow!!!
-    # for meshNode in cmds.ls(type="mesh", long=True):
-    #     if cmds.getAttr("%s.aiTranslator" % meshNode) == "mesh_light":
-    #         scn_Lights.append(meshNode)
+    for meshNode in cmds.ls(type="mesh", long=True):
+        if cmds.getAttr("%s.aiTranslator" % meshNode) == "mesh_light":
+            scn_Lights.append(meshNode)
 
-    currLayer = cmds.editRenderLayerGlobals(query= True, crl = True)
+    currLayer = cmds.editRenderLayerGlobals(query= True, crl=True)
     currLy_objs = cmds.editRenderLayerMembers(currLayer,
                                               query=True,
                                               fullNames=True) or []

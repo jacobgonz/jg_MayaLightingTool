@@ -29,7 +29,7 @@ class TabContent():
 
         self.scn_lights, self.rl_lights, self.rl_lights_list, self.scn_lights_list = lm_util.getSceneLights()
 
-        self.sel_lbt, lightShape = self._getSelectedLight()
+        self.sel_lbt, lightShape, self.allSelLights = self._getSelectedLight()
 
         ### Fill Lights Tab
         self._activeLightsLayout()
@@ -39,7 +39,7 @@ class TabContent():
         if self.sel_lbt:
             self._updateAttrEditor(lightShape)
             self._lightLayersTab(lightShape)
-            self._highlightSelLight(lightShape)
+            self._highlightSelLight(lightShape, self.allSelLights)
 
         currLayer = cmds.editRenderLayerGlobals(currentRenderLayer =True,
                                                 query = True)
@@ -64,6 +64,8 @@ class TabContent():
 
         # Add Script Job
         self._createScriptJobs()
+
+        selTreeLights = self.ui.trOutliner.selectedItems(), 'here'
 
     def _displayContextMenu(self, myLight, lightShape):
         btn = self.light_bt[lightShape]
@@ -365,7 +367,6 @@ class TabContent():
     ## SIGNAL FUNCTIONS - ACTIVE LIGHTS
 
     def _addRemoveFromLayers(self, myLight, rL=None, remove=True, allLayers=False):
-        # FIXME: workaround for add/remove buttons on lighLayersTab/ must revise
         if myLight == "selected":
             myLight = self._getSelectedLight()[0]
 
@@ -387,7 +388,6 @@ class TabContent():
             cmds.warning("Render Layer %s does not exist. Upade UI first" % rL)
             return None
 
-        # FIXME: workaround for add/remove buttons on lighLayersTab/ must revise
         if remove == "check":
             remove = (myLight in (cmds.editRenderLayerMembers(rL,
                                     q=True,
@@ -429,11 +429,11 @@ class TabContent():
             lightSel = (treeLight == myLight)
             self.treeItems[treeLight].setSelected(lightSel)
 
-        self._highlightSelLight(lightShape)
+        self._highlightSelLight(lightShape, self.allSelLights)
 
         return None
 
-    def _highlightSelLight(self, lightShape):
+    def _highlightSelLight(self, lightShape, allSelLights):
         ### Highlight label on selected light
         myLight = cmds.listRelatives(lightShape, parent =True, fullPath= True)[0]
         for light_label in self.light_label.keys():
@@ -443,7 +443,12 @@ class TabContent():
                 light_font.setWeight(100)
                 self.light_label[light_label].setFont(light_font)
                 self.light_label[light_label].setStyleSheet("background-color: #52869e")
-
+            elif light_label in allSelLights and self._lightOnCurrentLayer(myLight) is True:
+                light_font = QtGui.QFont(self.light_label[light_label].font())
+                light_font.setBold(True)
+                light_font.setWeight(100)
+                self.light_label[light_label].setFont(light_font)
+                self.light_label[light_label].setStyleSheet("background-color: #5f7681")
             else:
                 light_font = QtGui.QFont(self.light_label[light_label].font())
                 light_font.setBold(False)
@@ -901,6 +906,8 @@ class TabContent():
                 if not self._lightOnCurrentLayer(myLight):
                     self._setTreeEntryColor(myLight, self.treeItems[myLight])
 
+                self.treeItems[myLight].setData(0, QtCore.Qt.UserRole, lightShape)
+
         return None
 
     def _setTreeEntryColor(self, myLight, treeItem):
@@ -918,6 +925,7 @@ class TabContent():
     def _selectLightsFromTree(self):
         selItems = self.ui.trOutliner.selectedItems()
         selLights = []
+        selLightShapes = []
 
         myLightFullName = None
 
@@ -928,16 +936,19 @@ class TabContent():
             myLight = str(item.text(0))
             myLightFullName = "%s|%s" % (grpName, myLight)
             if cmds.objExists(myLightFullName):
+                lightShape = cmds.listRelatives(myLightFullName,
+                                                allDescendents=True,
+                                                fullPath=True)[0]
+                selLightShapes.append(lightShape)
                 selLights.append(myLightFullName)
 
         if not len(selLights):
             return None
 
-        if selLights[-1] and cmds.objExists(selLights[-1]):
-            lightShape = cmds.listRelatives(selLights[-1],
-                                            allDescendents=True,
-                                            fullPath=True)[0]
-            self._highlightSelLight(lightShape)
+        self.allSelLights = selLightShapes
+        lastSelLight = self.allSelLights[-1]
+
+        self._highlightSelLight(lastSelLight, self.allSelLights)
 
         cmds.select(selLights)
 
@@ -1002,26 +1013,34 @@ class TabContent():
 
     def _getSelectedLight(self):
         userSel = cmds.ls(sl=True, long=True)
-        if not userSel:
-            return False, None
-
-        lastObj = cmds.ls(sl=True, long=True)[-1]
         sel_light = False
         sel_lightShape = False
+        allSelLights = []
+
+        if not userSel:
+            return sel_light, sel_lightShape, allSelLights
+
+        lastObj = cmds.ls(sl=True, long=True)[-1]
 
         for lightShape in self.scn_lights_list:
             lightTrans = cmds.listRelatives(lightShape,
                                             parent=True,
                                             fullPath=True)[0]
+            if lightTrans in userSel:
+                allSelLights.append(lightShape)
+
             if lightTrans == lastObj:
                 sel_light = lastObj
                 sel_lightShape = lightShape
 
-        return sel_light, sel_lightShape
+        return sel_light, sel_lightShape, allSelLights
 
     def _addAttrWidget(self, layout, lyParent, values, attr_type='cbx',
                             size=[10, 60, 40, 80]):
-        if not cmds.objExists(values[0]):
+
+        myAttr, label = values
+
+        if not cmds.objExists(myAttr):
             return False
 
         if not cmds.window('lmTmpWin', exists=True):
@@ -1030,24 +1049,36 @@ class TabContent():
         cmds.columnLayout(adjustableColumn=True)
 
         if attr_type == 'cbx':
-            ui_item = cmds.checkBox(label=values[1], v=False, rs=False, w=60)
-            cmds.connectControl(ui_item, values[0])
+            ui_item = cmds.checkBox(label=label, v=False, rs=False, w=60)
+            cmds.checkBox(ui_item,
+                          changeCommand = lambda attr: self._onAttrChanged(myAttr),
+                          edit=True)
+            cmds.connectControl(ui_item, myAttr)
 
         if attr_type == 'color':
-            ui_item = cmds.attrColorSliderGrp(label=values[1], attribute=values[0],
+            ui_item = cmds.attrColorSliderGrp(label=label, attribute=myAttr,
                 cl4=['left', 'left', 'left', 'left'], cw4=[10, 15, 50, 80])
 
         if attr_type == 'floatSlider':
-            ui_item = cmds.attrFieldSliderGrp(label=values[1], attribute=values[0],
+            ui_item = cmds.attrFieldSliderGrp(label=label, attribute=myAttr,
                 cl4=['left', 'left', 'left', 'left'], cw4=size, pre=2)
+            cmds.attrFieldSliderGrp(ui_item,
+                                changeCommand = lambda *args: self._onAttrChanged(myAttr),
+                                edit=True)
 
         if attr_type == 'floatSliderMesh':
-            ui_item = cmds.attrFieldSliderGrp(label=values[1], attribute=values[0],
+            ui_item = cmds.attrFieldSliderGrp(label=label, attribute=myAttr,
                 cl3=["left", "left", "left"], cw3=size, pre=2)
+            cmds.attrFieldSliderGrp(ui_item,
+                                changeCommand = lambda *args: self._onAttrChanged(myAttr),
+                                edit=True)
 
         if attr_type == 'float2Col':
-            ui_item = cmds.attrFieldSliderGrp(label=values[1], attribute=values[0],
+            ui_item = cmds.attrFieldSliderGrp(label=label, attribute=myAttr,
                  cl2=["left", "left"], cw2=size, pre=2)
+            cmds.attrFieldSliderGrp(ui_item,
+                                changeCommand = lambda *args: self._onAttrChanged(myAttr),
+                                edit=True)
 
         qtObj = lm_util.toQtObject(ui_item)
         qtObj.setParent(lyParent)
@@ -1058,6 +1089,42 @@ class TabContent():
 
         return qtObj
 
+    def _onAttrChanged(self, changedAttr):
+        selItems = self.ui.trOutliner.selectedItems()
+
+        selLights = [x.data(0, QtCore.Qt.UserRole) for x in selItems]
+
+        lightChanged = changedAttr.split(".")[0]
+
+        if not selLights or lightChanged not in selLights:
+            return
+
+        currLayer = cmds.editRenderLayerGlobals(crl =True, q = True)
+
+        if currLayer == "defaultRenderLayer":
+                isOverride = False
+        else:
+            isOverride = (currLayer in (cmds.listConnections(changedAttr,
+                                                        type="renderLayer") or []))
+
+        attrValue = cmds.getAttr(changedAttr)
+        myAttr = changedAttr.split(".")[-1]
+
+        for lightShape in selLights:
+            if not cmds.attributeQuery(myAttr, node=lightShape, exists=True):
+                continue
+
+            ligthAttr = "%s.%s" % (lightShape, myAttr)
+
+            if isOverride is not False:
+                cmds.editRenderLayerAdjustment(ligthAttr)
+            elif currLayer != "defaultRenderLayer":
+                cmds.editRenderLayerAdjustment(ligthAttr, remove=True)
+
+            cmds.setAttr(ligthAttr, attrValue)
+
+        return None
+
     ############################################################################
     ### UI UPDATE FUNCTIONS
 
@@ -1065,7 +1132,7 @@ class TabContent():
         if self.currentLightAttr:
             self.lightAttrW[self.currentLightAttr].hide()
 
-        selLight, selShape = self._getSelectedLight()
+        selLight, selShape, self.allSelLights = self._getSelectedLight()
 
         if selShape not in sorted(self.lightAttrW):
             self._attrEditor(selShape)
@@ -1152,9 +1219,10 @@ class TabContent():
             self.treeItems[myLight].setSelected(lightSel)
 
         # Update selected Light on Active and Attr Editor
-        self.sel_lbt, selShape = self._getSelectedLight()
+        self.sel_lbt, selShape, self.allSelLights = self._getSelectedLight()
+
         if selShape in sorted(self.hboxLight):
-            self._highlightSelLight(selShape)
+            self._highlightSelLight(selShape, self.allSelLights)
 
             self._updateAttrEditor(selShape)
 
@@ -1181,6 +1249,8 @@ class TabContent():
         return self.scriptJobs
 
     def _updateRenderLayer(self):
+        if not lm_util.mayaWindowExists('lightingTool_ui'):
+            return None
 
         ## Refresh UI Widgets
         self._refreshWidgets()
