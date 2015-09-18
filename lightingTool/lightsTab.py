@@ -65,7 +65,7 @@ class TabContent():
         # Add Script Job
         self._createScriptJobs()
 
-        selTreeLights = self.ui.trOutliner.selectedItems(), 'here'
+        selTreeLights = self.ui.trOutliner.selectedItems()
 
     def _displayContextMenu(self, myLight, lightShape):
         btn = self.light_bt[lightShape]
@@ -397,10 +397,7 @@ class TabContent():
             rLayers = [rL]
 
         for rL in rLayers:
-            cmds.editRenderLayerMembers(rL,
-                                        myLight,
-                                        remove = remove,
-                                        noRecurse=True)
+            lm_util.removeAddLightFromLayer(myLight, rL, remove=remove)
 
         ## Refresh UI Widgets
         # TODO: update lights variables internally to gain speed
@@ -435,15 +432,16 @@ class TabContent():
 
     def _highlightSelLight(self, lightShape, allSelLights):
         ### Highlight label on selected light
-        myLight = cmds.listRelatives(lightShape, parent =True, fullPath= True)[0]
+        myLight = cmds.listRelatives(lightShape, parent=True, fullPath=True)[0]
+
         for light_label in self.light_label.keys():
-            if light_label == lightShape and self._lightOnCurrentLayer(myLight) is True:
+            if light_label == lightShape and lm_util.lightOnCurrentLayer(myLight) is True:
                 light_font = QtGui.QFont(self.light_label[light_label].font())
                 light_font.setBold(True)
                 light_font.setWeight(100)
                 self.light_label[light_label].setFont(light_font)
                 self.light_label[light_label].setStyleSheet("background-color: #52869e")
-            elif light_label in allSelLights and self._lightOnCurrentLayer(myLight) is True:
+            elif light_label in allSelLights and lm_util.lightOnCurrentLayer(myLight) is True:
                 light_font = QtGui.QFont(self.light_label[light_label].font())
                 light_font.setBold(True)
                 light_font.setWeight(100)
@@ -460,7 +458,6 @@ class TabContent():
 
     ############################################################################
     ###### CHANNEL BOX
-
     def _attrEditor(self, lightShape):
         attrGrid = QtGui.QGridLayout(self.ui.scrlyAttr)
         self.ui.lyAttr.addLayout(attrGrid)
@@ -901,9 +898,9 @@ class TabContent():
                 if os.path.exists(iconPath):
                     self.treeItems[myLight].setIcon(0, QtGui.QIcon(iconPath))
                 else:
-                    self.treeItems[myLight].setIcon(0,QtGui.QIcon(':/%s.png' % lightType.lower()))
+                    self.treeItems[myLight].setIcon(0, QtGui.QIcon(':/%s.png' % lightType.lower()))
 
-                if not self._lightOnCurrentLayer(myLight):
+                if not lm_util.lightOnCurrentLayer(myLight):
                     self._setTreeEntryColor(myLight, self.treeItems[myLight])
 
                 self.treeItems[myLight].setData(0, QtCore.Qt.UserRole, lightShape)
@@ -911,7 +908,7 @@ class TabContent():
         return None
 
     def _setTreeEntryColor(self, myLight, treeItem):
-        if not self._lightOnCurrentLayer(myLight):
+        if not lm_util.lightOnCurrentLayer(myLight):
             brush = QtGui.QBrush(QtGui.QColor(170, 0, 0))
         else:
             brush = QtGui.QBrush(QtGui.QColor(200, 200, 200))
@@ -978,18 +975,13 @@ class TabContent():
             if currLayer == 'defaultRenderLayer':
                 return False
 
-            rmLight = (btName == 'remove')
+            remove = (btName == "remove")
             if allLayers:
                 for rL in rLayers:
-                    cmds.editRenderLayerMembers(rL,
-                                                myLight,
-                                                r= rmLight,
-                                                nr= True)
+                    lm_util.removeAddLightFromLayer(myLight, rL, remove=remove)
+
             else:
-                cmds.editRenderLayerMembers(currLayer,
-                                            myLight,
-                                            r= rmLight,
-                                            nr= True)
+                lm_util.removeAddLightFromLayer(myLight, currLayer, remove=remove)
 
         ## Refresh UI Widgets
         self._refreshWidgets()
@@ -998,19 +990,6 @@ class TabContent():
 
     # ##########################################################################
     ### MAIN FUNCTIONS
-
-    def _lightOnCurrentLayer(self, myLight):
-        currLayer = cmds.editRenderLayerGlobals(query= True, crl = True)
-        currLy_objs = cmds.editRenderLayerMembers(currLayer, query=True,
-                                                  fullNames=True)
-
-        if not currLy_objs:
-            return False
-        if not myLight in currLy_objs:
-            return False
-
-        return True
-
     def _getSelectedLight(self):
         userSel = cmds.ls(sl=True, long=True)
         sel_light = False

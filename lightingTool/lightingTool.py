@@ -127,6 +127,15 @@ class PublishDialog(QtGui.QDialog, lt_form.Ui_LightManagerForm):
 
         return None
 
+    def keyPressEvent(self, event):
+        # Workaround to stop Maya from stealing focus
+        if event.key() in (QtCore.Qt.Key_Shift, QtCore.Qt.Key_Control):
+            event.accept()
+        else:
+            event.ignore()
+
+        return None
+
     def enterEvent(self, event):
         # GetCurrentTab Label
         tabIndex = self.tabMain.currentIndex()

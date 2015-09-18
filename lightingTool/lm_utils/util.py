@@ -78,25 +78,55 @@ def createLocator(locatorType, asLight=False):
 
     return (shapeName, lName)
 
-def getSelectedLight(lightType, validTypes):
+def getLightShapeNode(node):
+    shapeNodes = cmds.listRelatives(node,
+                                    allDescendents=True,
+                                    fullPath=True,
+                                    shapes=True) or []
+
+    shapeNodes = filter(lambda x: cmds.nodeType(x) in getLightTypes(),
+                        shapeNodes) or []
+
+    if not len(shapeNodes):
+        return False
+
+    # TODO: Review - Return only 1 shape node (keep an eye for multiple shapeNodes)
+    lightShape = shapeNodes[0]
+
+    return lightShape
+
+def lightOnCurrentLayer(myLight):
+    currLayer = cmds.editRenderLayerGlobals(query= True, crl = True)
+    currLy_objs = cmds.editRenderLayerMembers(currLayer,
+                                              query=True,
+                                              fullNames=True)
+
+    if not currLy_objs:
+        return False
+
+    lightShape = getLightShapeNode(myLight)
+
+    if myLight in currLy_objs or lightShape in currLy_objs:
+        return True
+
+    return False
+
+def getSelectedLightShape(lightType, validTypes):
     userSel = cmds.ls(sl=True)
+
     if not userSel:
         return False
 
-    objRel = cmds.listRelatives(userSel, allDescendents=True, fullPath=True)
-    if not objRel:
-        return False
-
-    lightShape = [x for x in objRel if cmds.nodeType(objRel) in validTypes]
+    lightShape = getLightShapeNode(userSel[0])
 
     if not lightShape:
         return False
 
-    return lightShape[0]
+    return lightShape
 
 def loadFileToLight(filePath, lightType, validTypes):
     # If Light selected: load file to this light (ony valid Types)
-    lightShape = getSelectedLight(lightType, validTypes)
+    lightShape = getSelectedLightShape(lightType, validTypes)
 
     #If not create a light based on lightType preset
     if not lightShape:
@@ -105,7 +135,7 @@ def loadFileToLight(filePath, lightType, validTypes):
     else:
         newLight = False
 
-    fileNode = cmds.shadingNode("file", asTexture=True, isColorManaged=True)
+    fileNode = cmds.shadingNode("file", asTexture=True)
     placeNode = cmds.shadingNode("place2dTexture", asUtility=True)
 
     conPlace2File = ["coverage", "translateFrame", "rotateFrame", "mirrorU",
@@ -139,6 +169,16 @@ def loadFileToLight(filePath, lightType, validTypes):
 
 #NEW getSceneLights
 
+def getLightTypes():
+    lightTypes = ['aiAreaLight',
+              'aiPhotometricLight',
+              'aiSkyDomeLight',
+              'areaLight',
+              'pointLight',
+              'spotLight',
+              'volumeLight']
+    return lightTypes
+
 def getSceneLights(layer=False):
     '''
         This function returns:
@@ -156,13 +196,7 @@ def getSceneLights(layer=False):
     rl_lights = []
     scn_Lights = []
 
-    lightTypes = ['aiAreaLight',
-                  'aiPhotometricLight',
-                  'aiSkyDomeLight',
-                  'areaLight',
-                  'pointLight',
-                  'spotLight',
-                  'volumeLight']
+    lightTypes = getLightTypes()
 
     scn_Lights = cmds.ls(type=["light"] + lightTypes, long=True)
 
@@ -186,7 +220,7 @@ def getSceneLights(layer=False):
         else:
             l_dict[l_parent].append(l)
 
-        if l_obj in currLy_objs:
+        if l_obj in currLy_objs or l in currLy_objs:
             rl_lights.append(l_obj)
 
             if l_parent not in layer_l_dict.keys():
@@ -195,6 +229,23 @@ def getSceneLights(layer=False):
                 layer_l_dict[l_parent].append(l)
 
     return l_dict, layer_l_dict, rl_lights, scn_Lights
+
+def removeAddLightFromLayer(transform, layer, remove=False):
+    cmds.editRenderLayerMembers(layer,
+                                transform,
+                                remove = remove,
+                                noRecurse=True)
+
+    # Remove light Shape nodes if inside the layer
+    lightShapeNode = getLightShapeNode(transform)
+
+    if lightShapeNode and remove:
+        cmds.editRenderLayerMembers(layer,
+                                    lightShapeNode,
+                                    r= remove,
+                                    nr= True)
+
+    return None
 
 def createLightGrpAttr(lightShape):
     attrName = "mtoa_constant_lightGroup"
